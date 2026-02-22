@@ -22,5 +22,5 @@ jobs:
       - name: Run script
         env:
           # ここでGitHubのSecretをプログラムの環境変数に紐付けます
-          GeminiAPIKey: ${{ secrets.GeminiAPIKey }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python main.py
