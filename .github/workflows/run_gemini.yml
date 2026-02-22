@@ -1,0 +1,26 @@
+name: Gemini Run Test
+
+on:
+  push:             # コードをアップロードした時に実行
+  workflow_dispatch: # 手動でボタンを押した時にも実行
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install google-generativeai
+
+      - name: Run script
+        env:
+          # ここでGitHubのSecretをプログラムの環境変数に紐付けます
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python main.py
