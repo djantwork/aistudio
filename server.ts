@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI, Type } from '@google/genai';
 
 const app = express();
 app.use(express.json());
@@ -51,6 +50,22 @@ const properties = [
   }
 ];
 
+// キーワード辞書（簡易的な自然言語解析の代わり）
+const keywordMap: Record<string, string[]> = {
+  'カフェ': ['カフェ', 'コーヒー', '喫茶店', 'お茶'],
+  'リモートワーク': ['リモート', 'テレワーク', '在宅', '仕事', 'ワーク'],
+  '静か': ['静か', '落ち着いた', '騒音', 'のんびり'],
+  '日当たり': ['日当たり', '明るい', '太陽', '光'],
+  '利便性': ['便利', 'スーパー', '買い物', 'アクセス'],
+  '駅近': ['駅近', '駅チカ', '徒歩', '近い'],
+  '公園': ['公園', '緑', '散歩', 'ピクニック'],
+  '自然': ['自然', '川', '森', '木', 'リバーサイド'],
+  '読書': ['読書', '本', '図書館'],
+  '音楽': ['音楽', 'ライブ', 'レコード', 'バンド'],
+  'クリエイティブ': ['クリエイティブ', 'デザイン', 'おしゃれ', 'カルチャー'],
+  'アート': ['アート', '美術館', 'ギャラリー', '絵']
+};
+
 app.post('/api/v1/match', async (req, res) => {
   try {
     const { query } = req.body;
@@ -58,37 +73,18 @@ app.post('/api/v1/match', async (req, res) => {
       return res.status(400).json({ error: 'Query is required' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
-      return res.status(500).json({ 
-        error: 'Gemini API Key is not configured. Please set a valid GEMINI_API_KEY in the AI Studio Secrets panel.' 
-      });
+    // 1. Extract tags using rule-based matching (Mocking LLM)
+    const userTags: string[] = [];
+    for (const [tag, keywords] of Object.entries(keywordMap)) {
+      if (keywords.some(kw => query.includes(kw))) {
+        userTags.push(tag);
+      }
     }
 
-    const ai = new GoogleGenAI({ apiKey });
-
-    // 1. Extract tags using Gemini
-    const extractResponse = await ai.models.generateContent({
-      model: 'gemini-flash-latest',
-      contents: `不動産検索のためのユーザー入力から、ライフスタイルタグと希望条件を抽出してください。'tags'という文字列の配列を持つJSONオブジェクトを返してください。タグは日本語で、簡潔な単語（例：カフェ、リモートワーク、静か）にしてください。ユーザー入力: "${query}"`,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            tags: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING },
-              description: '抽出されたライフスタイルと条件のタグリスト（日本語）'
-            }
-          },
-          required: ['tags']
-        }
-      }
-    });
-
-    const extractedData = JSON.parse(extractResponse.text || '{"tags": []}');
-    const userTags = extractedData.tags;
+    // 何もマッチしなかった場合のフォールバック
+    if (userTags.length === 0) {
+      userTags.push('静か', '日当たり');
+    }
 
     // 2. Score properties
     const scoredProperties = properties.map(prop => {
@@ -105,22 +101,25 @@ app.post('/api/v1/match', async (req, res) => {
 
     const topProperties = scoredProperties.slice(0, 2);
 
-    // 3. Generate recommendation reasons
-    const results = await Promise.all(topProperties.map(async (prop) => {
-      const reasonResponse = await ai.models.generateContent({
-        model: 'gemini-flash-latest',
-        contents: `ユーザーのライフスタイル希望: "${query}"
-        以下の物件を推薦します: ${prop.title} (${prop.location})
-        物件説明: ${prop.description}
-        物件の特徴タグ: ${prop.tags.join(', ')}
-        
-        この物件がなぜユーザーのライフスタイルに最適なのかを説明する、魅力的で簡潔な文章（日本語で2〜3文程度）を作成してください。`,
-      });
+    // 3. Generate recommendation reasons (Mocking LLM)
+    const results = topProperties.map((prop) => {
+      const matched = prop.matchedTags.join('や');
+      let reasonText = '';
+      
+      if (matched) {
+        reasonText = `ご希望の「${matched}」という条件にぴったりマッチする物件です。${prop.description} あなたの理想のライフスタイルを実現できる環境が整っています。`;
+      } else {
+        reasonText = `あなたの入力したライフスタイルから、こちらの物件をピックアップしました。${prop.description}`;
+      }
+
       return {
         ...prop,
-        recommendationReason: reasonResponse.text
+        recommendationReason: reasonText
       };
-    }));
+    });
+
+    // 意図的な遅延を入れてAIの処理時間をシミュレート（UX向上のため）
+    await new Promise(resolve => setTimeout(resolve, 800));
 
     res.json({
       extractedTags: userTags,
@@ -129,9 +128,6 @@ app.post('/api/v1/match', async (req, res) => {
 
   } catch (error: any) {
     console.error('Error in /api/v1/match:', error);
-    if (error.message?.includes('API key not valid') || error.status === 400) {
-      return res.status(400).json({ error: 'Invalid Gemini API Key. Please check your AI Studio Secrets.' });
-    }
     res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });

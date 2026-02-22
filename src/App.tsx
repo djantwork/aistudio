@@ -228,19 +228,18 @@ function ArchitectureTab() {
         </div>
 
         <div className="p-6 bg-emerald-50 rounded-2xl border border-emerald-100">
-          <h3 className="text-lg font-medium text-emerald-900 mb-3 flex items-center gap-2"><Sparkles size={20}/> 3. ライフスタイル解析 (LLM Integration - Gemini API)</h3>
-          <p className="text-emerald-800">受信したテキストをプロンプトに組み込み、LLMに送信します。LLMはテキストから「価値観タグ（例: 静か, カフェ, リモートワーク）」や「必須条件」を抽出し、構造化データ（JSON）として返却します。</p>
+          <h3 className="text-lg font-medium text-emerald-900 mb-3 flex items-center gap-2"><Sparkles size={20}/> 3. ライフスタイル解析 (Rule-based Matching)</h3>
+          <p className="text-emerald-800">受信したテキストをローカルのキーワード辞書と照合します。外部API（LLM）は使用せず、テキストから「価値観タグ（例: 静か, カフェ, リモートワーク）」をルールベースで抽出します。</p>
         </div>
 
         <div className="p-6 bg-stone-50 rounded-2xl border border-stone-100">
-          <h3 className="text-lg font-medium text-stone-900 mb-3">4. マッチング・エンジン (Scoring/Vector Search)</h3>
-          <p>抽出されたタグをもとに、物件データベースを検索します。今回のモックアップでは、物件の持つタグとユーザーの抽出タグの重複度合いによるスコアリングを行っています。<br/>
-          <strong>本番環境の想定:</strong> PineconeやpgvectorなどのベクトルDBを用い、ユーザーの入力テキストの埋め込み（Embedding）と物件説明の埋め込みのコサイン類似度を計算するハイブリッド検索（キーワード＋セマンティック）を実装します。</p>
+          <h3 className="text-lg font-medium text-stone-900 mb-3">4. マッチング・エンジン (Scoring)</h3>
+          <p>抽出されたタグをもとに、物件データベースを検索します。物件の持つタグとユーザーの抽出タグの重複度合いによるスコアリングを行っています。</p>
         </div>
 
         <div className="p-6 bg-emerald-50 rounded-2xl border border-emerald-100">
-          <h3 className="text-lg font-medium text-emerald-900 mb-3 flex items-center gap-2"><Sparkles size={20}/> 5. レコメンド理由の生成 (LLM Integration - Gemini API)</h3>
-          <p className="text-emerald-800">スコア上位の物件データとユーザーの元の入力テキストを再度LLMに渡し、「なぜこの物件がおすすめなのか」を説明するパーソナライズされたテキストを動的に生成します。</p>
+          <h3 className="text-lg font-medium text-emerald-900 mb-3 flex items-center gap-2"><Sparkles size={20}/> 5. レコメンド理由の生成 (Template-based)</h3>
+          <p className="text-emerald-800">スコア上位の物件データとマッチしたタグをもとに、「なぜこの物件がおすすめなのか」を説明するテキストをテンプレートから動的に生成します（外部AI APIは不使用）。</p>
         </div>
 
         <div className="p-6 bg-stone-50 rounded-2xl border border-stone-100">
