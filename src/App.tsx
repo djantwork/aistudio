@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Home, MapPin, Tag, Sparkles, Database, Server, Code, Loader2 } from 'lucide-react';
+import { Search, Home, MapPin, Tag, Sparkles, Database, Server, Code, Loader2, RefreshCw, Plus } from 'lucide-react';
 
 type Property = {
   id: string;
@@ -19,6 +19,11 @@ type Property = {
 type MatchResponse = {
   extractedTags: string[];
   recommendations: Property[];
+};
+
+type IntegrationStatus = {
+  ieloveCloud: { configured: boolean; apiBaseUrl: string | null; companyId: string | null };
+  reinfolib: { configured: boolean; apiBaseUrl: string; requestPage: string };
 };
 
 export default function App() {
@@ -144,6 +149,8 @@ function DemoTab() {
         </motion.div>
       )}
 
+      <PropertyManagementPanel />
+
       {result && !error && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -159,7 +166,7 @@ function DemoTab() {
             ))}
           </div>
 
-          <div className="space-y-6">
+      <div className="space-y-6">
             {result.recommendations.map((prop) => (
               <div key={prop.id} className="bg-white rounded-3xl overflow-hidden border border-stone-200 shadow-sm flex flex-col md:flex-row">
                 <div className="md:w-2/5 relative">
@@ -208,6 +215,105 @@ function DemoTab() {
         </motion.div>
       )}
     </motion.div>
+  );
+}
+
+
+function PropertyManagementPanel() {
+  const [status, setStatus] = useState<IntegrationStatus | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [form, setForm] = useState({ title: '', location: '', rent: 100000, layout: '', tags: '', description: '' });
+
+  const loadStatus = async () => {
+    try {
+      const res = await fetch('/api/v1/integrations/status');
+      const data = await res.json();
+      if (res.ok) setStatus(data);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    loadStatus();
+  }, []);
+
+  const registerProperty = async () => {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const res = await fetch('/api/v1/properties', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          rent: Number(form.rent),
+          tags: form.tags.split(',').map((v) => v.trim()).filter(Boolean),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '登録に失敗しました');
+      setMessage(`手動登録完了: ${data.title}`);
+      setForm({ title: '', location: '', rent: 100000, layout: '', tags: '', description: '' });
+    } catch (err: any) {
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sync = async (source: 'ielove-cloud' | 'reinfolib') => {
+    setLoading(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/v1/integrations/${source}/sync`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '同期に失敗しました');
+      setMessage(`${source} から ${data.importedCount} 件取り込みました`);
+    } catch (err: any) {
+      setMessage(err.message);
+    } finally {
+      setLoading(false);
+      loadStatus();
+    }
+  };
+
+  return (
+    <div className="bg-white p-6 rounded-2xl border border-stone-200 space-y-5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xl font-semibold">物件登録・外部連携準備</h3>
+        <button onClick={loadStatus} className="text-sm px-3 py-2 rounded-lg border border-stone-200 flex items-center gap-2">
+          <RefreshCw size={14} /> 更新
+        </button>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3 text-sm">
+        <div className="p-3 rounded-xl bg-stone-50 border border-stone-200">
+          <p className="font-medium">いえらぶCLOUD</p>
+          <p className="text-stone-500">状態: {status?.ieloveCloud.configured ? '設定済み' : '未設定'}</p>
+          <button disabled={loading} onClick={() => sync('ielove-cloud')} className="mt-2 text-xs px-3 py-2 rounded-lg bg-emerald-600 text-white disabled:opacity-60">同期実行</button>
+        </div>
+        <div className="p-3 rounded-xl bg-stone-50 border border-stone-200">
+          <p className="font-medium">REINFOLIB (国交省API)</p>
+          <p className="text-stone-500">状態: {status?.reinfolib.configured ? '設定済み' : '申請/キー待ち'}</p>
+          <button disabled={loading} onClick={() => sync('reinfolib')} className="mt-2 text-xs px-3 py-2 rounded-lg bg-emerald-600 text-white disabled:opacity-60">同期実行</button>
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3">
+        <input className="px-3 py-2 border border-stone-200 rounded-lg" placeholder="物件名" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
+        <input className="px-3 py-2 border border-stone-200 rounded-lg" placeholder="エリア" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+        <input className="px-3 py-2 border border-stone-200 rounded-lg" placeholder="賃料" type="number" value={form.rent} onChange={(e) => setForm({ ...form, rent: Number(e.target.value) })} />
+        <input className="px-3 py-2 border border-stone-200 rounded-lg" placeholder="間取り" value={form.layout} onChange={(e) => setForm({ ...form, layout: e.target.value })} />
+      </div>
+      <input className="w-full px-3 py-2 border border-stone-200 rounded-lg" placeholder="タグ(カンマ区切り)" value={form.tags} onChange={(e) => setForm({ ...form, tags: e.target.value })} />
+      <textarea className="w-full px-3 py-2 border border-stone-200 rounded-lg" placeholder="説明" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+      <button disabled={loading} onClick={registerProperty} className="px-4 py-2 rounded-lg bg-stone-900 text-white flex items-center gap-2 disabled:opacity-60">
+        <Plus size={16} /> 手動登録
+      </button>
+      {message && <p className="text-sm text-stone-600">{message}</p>}
+    </div>
   );
 }
 
@@ -321,6 +427,15 @@ function ApiTab() {
           <code className="text-lg font-mono text-stone-800">/api/v1/match</code>
         </div>
         <p className="text-stone-600">ユーザーの自由記述を受け取り、最適な物件とレコメンド理由を返却します。</p>
+      </div>
+
+
+      <div className="mb-8 space-y-3 text-stone-600">
+        <p><code className="font-mono">GET /api/v1/properties</code> 手動登録 + 外部同期 + シード物件の一覧取得</p>
+        <p><code className="font-mono">POST /api/v1/properties</code> 自社物件の手動登録</p>
+        <p><code className="font-mono">GET /api/v1/integrations/status</code> 外部連携の設定状態確認</p>
+        <p><code className="font-mono">POST /api/v1/integrations/ielove-cloud/sync</code> いえらぶCLOUD同期</p>
+        <p><code className="font-mono">POST /api/v1/integrations/reinfolib/sync</code> REINFOLIB同期（APIキー承認後）</p>
       </div>
 
       <div className="space-y-6">
