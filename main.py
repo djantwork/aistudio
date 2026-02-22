@@ -1,15 +1,22 @@
 import os
-import google.generativeai as genai
+from google import genai # 新しいインポート方法
 
-# GitHubのSecretから自動的に読み込まれるように設定
+# GitHubのSecretから読み込み
 api_key = os.environ.get("GEMINI_API_KEY")
 
 if not api_key:
-    raise ValueError("APIキーが設定されていません。")
+    raise ValueError("GEMINI_API_KEY が設定されていません。")
 
-genai.configure(api_key=api_key)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# クライアントの初期化 (最新の方式)
+client = genai.Client(api_key=api_key)
 
-# 実行テスト
-response = model.generate_content("GitHub Actionsからのテストです。短い挨拶を返して。")
-print(response.text)
+try:
+    # 実行テスト (モデル名は 'gemini-1.5-flash' でOKです)
+    response = client.models.generate_content(
+        model='gemini-1.5-flash', 
+        contents="GitHub Actionsからのテストです。接続成功！と元気に返して。"
+    )
+    print(response.text)
+    
+except Exception as e:
+    print(f"エラーが発生しました: {e}")
